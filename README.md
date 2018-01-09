@@ -1,6 +1,7 @@
 # ATS_Project
 
 ## Motivation
+iff $D_t$
 
 ## Implementation
 
