@@ -123,6 +123,19 @@ def get_zscore(day, pf_value,window):
     roll_avg = pd.rolling_mean(pf_value,window).loc[day]
     roll_std =pd.rolling_std(pf_value,window).loc[day]
     return ( (value-roll_avg )/ roll_std )[0]
+
+def get_spread(df1,df2):
+    # model is OIL - ratio * GAS = const if spread = 1
+    # else if spread = -1 it is OIL - GAS/ratio = - const/ratio
+    ratio, spread = get_ratio(df1, df2)
+
+    if spread == 1:
+        data_spread = df1['Value'].values - ratio * df2['Value'].values
+    else:
+        data_spread = df2['Value'].values - ratio * df1['Value'].values
+    
+    df_spread = pd.DataFrame(data_spread, index = df1.index, columns=['Value'])
+    return df_spread
 #%%
 
 # compute the hedging ratio for the spread
@@ -141,12 +154,10 @@ def get_ratio(df_in_1, df_in_2):
     # then chose the regression model for which the stationarity is more important
     if is_more_stationary(resid_2on1,resid_1on2):
         hedge_ratio = model_2on1.params[1]
-        const = model_2on1.params[0]
-        return const, hedge_ratio, 2
+        return hedge_ratio, -1
     else:
         hedge_ratio = model_1on2.params[1]
-        const = model_1on2.params[0]
-        return const, hedge_ratio, 1
+        return hedge_ratio, 1
 #%%
 df_oil = load_data_from_csv(ticker_oil)
 df_gas = load_data_from_csv(ticker_oil2)
