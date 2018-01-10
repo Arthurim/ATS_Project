@@ -21,105 +21,32 @@ path = "C:\\Users\\Arthur\\Documents\\Studies\\ParisDauphineUniversity\\Master20
 ticker_oil = "CO1_COMDTY"
 ticker_gas = "NG1_COMDTY"
 
+TICKER_LIST = ["BP_EQUITY","CAC_INDEX","CHEVRON_EQUITY","CNYUSD_CRRCY","CO1_COMDTY","CONOCOPHIL_INDEX","DJ_INDEX","EURGBP_CRRCY","EURUSD_CRRCY","EXON_EQUITY","LMECOPPER_COMDTY","MSCI_INDEX","NK_INDEX","NG1_COMDTY","SHELL_EQUITY","SPX_INDEX","TOTAL_EQUITY","USDGBP_CRRCY","XB1_COMDTY"]
+
+
+    
+#%%
+enter=1.5
+close=0.5
+window=20
+ticker1 =ticker_oil# "BP_EQUITY"
+ticker2 = "XB1_COMDTY"
+
+#df_pnl = pair_trading(ticker1,ticker2,K_up,K_down,window)
 
 #%%
-# Load data
-df1, df2 = get_same_dates(load_data_from_csv(ticker1), load_data_from_csv(ticker2))
 
+df1, df2 = get_same_dates(load_data_from_csv(ticker1), load_data_from_csv(ticker2))
+    
 # Sample data
 df1_in, df1_out = sampling(df1)
 df2_in, df2_out = sampling(df2)
 
 # Compute the hedging ratio and get the spread to long
-df_spread = get_spread(df1, df2)
-
-# model is OIL - ratio * GAS = const if spread = 1
-# else if spread = -1 it is OIL - GAS/ratio = - const/ratio
-ratio, spread = get_ratio(df1, df2)
-
-if spread == 1:
-    data_spread = df1['Value'].values - ratio * df2['Value'].values
-else:
-    data_spread = df2['Value'].values - ratio * df1['Value'].values
-
-df_spread = pd.DataFrame(data_spread, index = df1.index, columns=['Value'])
-
+df_spread = get_spread(df1,df2)
 df_spread_return = get_returns(df_spread)
-
-invst = None
-pnl=0
 #%%
-window = 15
-K_up = 1.5
-K_down = 0.5
-base_quantity = 10000
-
-df_out_oil['Position'] = 0
-df_out_gas['Position'] = 0
-          
-df_pf_val = pd.DataFrame(index = df_out_oil.index, columns=['Value'])
-
-udl_list = [df_out_oil, df_out_gas]
-
-prev_d = df_out_oil.index[0]          
-pnl=0
-spread = 15
-pos=0
-
-invst = None
-
-#%%
-pnl=0
-
-pnl_r = 0
-
-invst=None
-for d in df1_out.index:
-
-    
-    zscore = get_zscore(d,df_spread,window)
-    
-    signal = get_signal(zscore,K_up,K_down)
-    
-    if invst is None:
-        if signal is "LONG_ENTRY":
-            pos = 1
-            invst = "Long"
-            print(signal+" on the " + str(d))
-        elif signal is "SHORT_ENTRY":
-            pos = -1
-            invst = "Short"
-            print(signal+" on the " + str(d))
-            
-    if invst is not None:       
-        if invst is "Short" and signal is "SHORT_CLOSE":
-            pos = 1
-            invst = None
-            print(signal+" on the " + str(d))
-        elif invst is "Long" and signal is "LONG_CLOSE":
-            pos = -1
-            invst = None
-            print(signal+" on the " + str(d))
-        
-        
-    pnl+=pos*df_spread.loc[d]
-    
-    pnl_r+=pos*df_spread_return.loc[d]
-    
-print('P&L is ', pnl[0])
-
-
-
-#%%
-def get_portfolio_value(d, udl_list):
-    pf = 0
-    for df in udl_list:
-        pf += df.loc[d]['Position']*df.loc[d]['Value']
-    return pf
-    
-    
-#%%
-def pair_trading(start, end, ticker1, ticker2, entry, close, window):
+def pair_trading(ticker1,ticker2,enter,close,window):
     
     # Load data
     df1, df2 = get_same_dates(load_data_from_csv(ticker1), load_data_from_csv(ticker2))
@@ -130,31 +57,51 @@ def pair_trading(start, end, ticker1, ticker2, entry, close, window):
     
     # Compute the hedging ratio and get the spread to long
     df_spread = get_spread(df1,df2)
+    df_spread_return = get_returns(df_spread)
     
-    window = 15
-    K_up = 1.5
-    K_down = 0.5
+    df_pnl = pd.DataFrame(index=df1_out.index,columns=['PnL'])
     
-    for d in df_spread.index:
+    pos=0
+    pnl=0
+    pnl_r = 0
+    
+    invst=None
+    for d in df1_out.index:
+    
         
-        zscore = get_zscore(d, df_spread, window)
+        zscore = get_zscore(d,df_spread,window)
         
-        signal = get_signal(zscore,K_up,K_down)
-        print(signal)
+        signal = get_signal(zscore,enter,close)
         
-        if signal in ["LONG_ENTRY","SHORT_CLOSE"]:
-            pos = 1
-        elif signal in ["LONG_CLOSE","SHORT_ENTRY"]:
-            pos = -1
-        else:
-            pos = 0
+        if invst is None:
+            if signal is "LONG_ENTRY":
+                pos = 1
+                invst = "Long"
+                print(signal+" on the " + str(d))
+            elif signal is "SHORT_ENTRY":
+                pos = -1
+                invst = "Short"
+                print(signal+" on the " + str(d))
+                
+        if invst is not None:       
+            if invst is "Short" and signal is "SHORT_CLOSE":
+                pos = 1
+                invst = None
+                print(signal+" on the " + str(d))
+            elif invst is "Long" and signal is "LONG_CLOSE":
+                pos = -1
+                invst = None
+                print(signal+" on the " + str(d))
             
-        pnl+=pos*df_spread.loc[d]
         
-        df_out_oil['Position'] = pos * w_oil
-        df_out_gas['Position'] = pos * w_gas
-                
-                
+        df_pnl.loc[d]['PnL']=pos*df_spread_return.loc[d][0]
+        
+        #pnl_r+=pos*df_spread_return.loc[d]
+        
+    df_pnl['PnL'].plot()
+    df_pnl.cumsum().plot()
+    return df_pnl            
+#%%                
                 
             
             
